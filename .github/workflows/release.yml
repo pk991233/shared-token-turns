@@ -1,0 +1,25 @@
+name: Publish Foundry module
+on:
+  push:
+    branches: [main]
+    paths: [module.json, .github/workflows/release.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          id=$(jq -er .id module.json)
+          tag=v$(jq -er .version module.json)
+          node --check scripts/main.mjs
+          jq -e --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$id.zip" '.download == $url' module.json
+          zip -q -r "$id.zip" module.json scripts
+          unzip -p "$id.zip" module.json | cmp - module.json
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes "統一先攻與共用回合。GM 選取兩個以上已加入遭遇的 Token，在戰鬥追蹤器按「共用回合」。" module.json "$id.zip"
